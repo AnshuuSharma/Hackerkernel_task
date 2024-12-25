@@ -89,10 +89,10 @@ class _LoginPageState extends State<LoginPage> {
               labelStyle: TextStyle(fontSize: 14,color: Colors.blueGrey),
               icon: Icon(i),
               enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.grey,width: 1), // Normal border color
+                borderSide: BorderSide(color: Colors.grey,width: 1), 
               ),
               focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.black, width: 2.0), // Focused border color
+                borderSide: BorderSide(color: Colors.black, width: 2.0), 
               ),
             )
           );
