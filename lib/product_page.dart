@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AddProductScreen extends StatefulWidget {
   @override
@@ -25,7 +29,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
-  void _addProduct() {
+  void _addProduct() async{
     if (_formKey.currentState?.validate() != true || _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please fill all fields and select an image.')),
@@ -33,15 +37,35 @@ class _AddProductScreenState extends State<AddProductScreen> {
       return;
     }
 
-    final product = {
+
+    try{
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      List<String>? productData = prefs.getStringList('products');
+      List products = productData != null
+          ? productData.map((e) => jsonDecode(e)).toList()
+          : [];
+      String productName = _nameController.text.trim();
+      if (products.any((product) => product['name'] == productName)) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("product already exists")));
+        return;
+      }
+
+    final newProduct = {
       'name': _nameController.text,
       'price': _priceController.text,
       'imagePath': _selectedImage!.path,
     };
+   products.add(newProduct);
 
-    // Save product to SharedPreferences (update your HomeScreen accordingly)
-    // Navigate back after adding product
-  }
+    List<String> updatedProductData =
+    products.map((product) => jsonEncode(product)).toList();
+    await prefs.setStringList('products', updatedProductData);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text("product added successfully!")));
+
+  }catch(e){
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('an error occurred :- $e')));
+    }}
 
   @override
   Widget build(BuildContext context) {
