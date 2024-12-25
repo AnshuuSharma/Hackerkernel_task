@@ -1,7 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_projects/product_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'add_product_page.dart'; //
 
 class HomePage extends StatefulWidget {
   @override
@@ -9,9 +12,9 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  List<Map<String, String>> products = [];
-  TextEditingController searchController = TextEditingController();
-  bool isLoading = false;
+  List<Map<String, String>> _products = [];
+  List<Map<String, String>> _filteredProducts = [];
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -20,109 +23,127 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadProducts() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? productsJson = prefs.getString('products');
-    if (productsJson != null) {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? productData = prefs.getStringList('products');
+    if (productData != null) {
       setState(() {
-        products = List<Map<String, String>>.from(json.decode(productsJson));
+        print("productData $productData");
+        _products =  productData.map((e) => Map<String, String>.from(jsonDecode(e))).toList()
+            ;
+        _filteredProducts = List.from(_products);
       });
     }
   }
 
-  Future<void> _saveProduct(List<Map<String, String>> productsList) async {
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString('products', json.encode(productsList));
+  Future<void> _saveProducts() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> productData = _products.map((e) => e.toString()).toList();
+    await prefs.setStringList('products', productData);
   }
 
-  void _deleteProduct(int index) {
+  void _filterProducts(String query) {
     setState(() {
-      products.removeAt(index);
+      _filteredProducts = _products
+          .where((product) => product['name']!.toLowerCase().contains(query.toLowerCase()))
+          .toList();
     });
-    _saveProduct(products);
   }
 
-  void _addProduct(Map<String, String> product) {
+  Future<void> _deleteProduct(int index) async {
     setState(() {
-      products.add(product);
+      _products.removeAt(index);
+      _filteredProducts = List.from(_products);
     });
-    _saveProduct(products);
+    await _saveProducts();
   }
 
-  void _navigateToAddProduct() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => AddProductScreen()),
-    );
-  }
-
-  void _searchProducts(String query) {
-    setState(() {
-      products = products.where((product) {
-        return product['name']!.toLowerCase().contains(query.toLowerCase());
-      }).toList();
-    });
+  Future<void> _logout() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', false);
+    Navigator.pushReplacementNamed(context, '/login'); // Navigate to Login Page
   }
 
   @override
   Widget build(BuildContext context) {
-    final filteredProducts = products.where((product) {
-      return product['name']!.toLowerCase().contains(searchController.text.toLowerCase());
-    }).toList();
-
     return Scaffold(
       appBar: AppBar(
         actions: [
           IconButton(
-            icon: Icon(Icons.exit_to_app),
-            onPressed: () {
-              Navigator.pushReplacementNamed(context, '/login');
-            },
+            icon: Icon(Icons.logout),
+            onPressed: _logout,
           ),
         ],
       ),
       body: Column(
         children: [
-          TextField(
-            controller: searchController,
-            onChanged: _searchProducts,
-            decoration: InputDecoration(
-              labelText: "Search Products",
-              labelStyle: TextStyle(fontSize: 14,color: Colors.blueGrey),
-              icon: Icon(Icons.search),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.grey,width: 1), // Normal border color
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Search Products',
+                border: OutlineInputBorder(),
               ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Colors.black, width: 2.0), // Focused border color
-              ),
+              onChanged: _filterProducts,
             ),
           ),
-          isLoading
-              ? Center(child: CircularProgressIndicator())
-              : filteredProducts.isEmpty
-              ? Center(child: Text('No Product Found'))
-              : Expanded(
-            child: ListView.builder(
-              itemCount: filteredProducts.length,
+          Expanded(
+            child: _filteredProducts.isEmpty
+                ? Center(child: Text('No Product Found'))
+                : ListView.builder(
+              itemCount: _filteredProducts.length,
               itemBuilder: (context, index) {
-                final product = filteredProducts[index];
+                final product = _filteredProducts[index];
                 return ListTile(
-                  title: Text(product['name']!),
-                  subtitle: Text(product['price']!),
+                  leading: product['image'] != null
+                      ? Image.file(
+                    File(product['image']!) ,
+                    width: 50,
+                    height: 50,
+                    fit: BoxFit.cover,
+                  )
+                      : Icon(Icons.image, size: 50),
+                  title: Text(product['name'] ?? ''),
+                  subtitle: Text('Price: \$${product['price']}'),
                   trailing: IconButton(
-                    icon: Icon(Icons.delete),
+                    icon: Icon(Icons.delete, color: Colors.blue[900]),
                     onPressed: () => _deleteProduct(index),
                   ),
                 );
               },
             ),
           ),
+          // FloatingActionButton(onPressed: ()=>setState(() {_loadProducts();}), child: Icon(Icons.refresh))
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _navigateToAddProduct,
-        child: Icon(Icons.add),
-      ),
+        floatingActionButton: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              FloatingActionButton(
+                onPressed: () => setState(() {
+                  _loadProducts();
+                }),
+                child: Icon(Icons.refresh,color: Colors.white),
+                backgroundColor: Colors.blue[900],
+              ),
+    SizedBox(width: 10,),
+    FloatingActionButton(
+      child: Icon(Icons.add,color: Colors.white,),
+      onPressed: () async {
+        bool? isAdded = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => AddProductScreen()),
+        );
+        if (isAdded == true) {
+          _loadProducts();
+        }
+      },
+      backgroundColor: Colors.blue[900],
+
+    ),
+            ]
+        )
+
     );
   }
 }

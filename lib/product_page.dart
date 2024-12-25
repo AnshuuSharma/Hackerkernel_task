@@ -38,34 +38,49 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
 
 
-    try{
+    try {
       SharedPreferences prefs = await SharedPreferences.getInstance();
+
       List<String>? productData = prefs.getStringList('products');
       List products = productData != null
           ? productData.map((e) => jsonDecode(e)).toList()
           : [];
+
+
       String productName = _nameController.text.trim();
       if (products.any((product) => product['name'] == productName)) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text("product already exists")));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Product already exists")),
+        );
         return;
       }
 
-    final newProduct = {
-      'name': _nameController.text,
-      'price': _priceController.text,
-      'imagePath': _selectedImage!.path,
-    };
-   products.add(newProduct);
 
-    List<String> updatedProductData =
-    products.map((product) => jsonEncode(product)).toList();
-    await prefs.setStringList('products', updatedProductData);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text("product added successfully!")));
+      final newProduct = {
+        'name': productName,
+        'price': _priceController.text.trim(),
+        'imagePath': _selectedImage?.path ?? '',
+      };
+      products.add(newProduct);
 
-  }catch(e){
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('an error occurred :- $e')));
-    }}
+
+      List<String> updatedProductData =
+      products.map((product) => jsonEncode(product)).toList();
+
+
+      await prefs.setStringList('products', updatedProductData);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Product added successfully!")),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('An error occurred: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
